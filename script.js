@@ -46,7 +46,10 @@ class Vector {
     } 
 
     elMod(vec) {
-        return new Vector((this.x + vec.x) % vec.x, (this.y + vec.y) % vec.y);
+        return new Vector(
+            ((this.x % vec.x) + vec.x) % vec.x, 
+            ((this.y % vec.y) + vec.y) % vec.y
+        );
     }
 
     norm() {
@@ -71,16 +74,18 @@ class Vector {
 
 class Boid {
     static MAX_SPEED = 10;
-    static MIN_SPEED = 5;
-    static VISION_RANGE = 100;
+    // static MIN_SPEED = 0;
+    static VISION_RANGE = 75;
     static AVOID_RANGE = 20;
-    static C1 = 0.001; // factor to move towards centre of mass of neighbouring boids
-    static C2 = 0.01; // factor for collision avoidance
-    static C3 = 0.02; // factor for matching velocity
+    static C1 = 0.005; // factor to move towards centre of mass of neighbouring boids
+    static C2 = 0.05; // factor for collision avoidance
+    static C3 = 0.05; // factor for matching velocity
 
     static WRAP = false;
     static BOUND_MARGIN = 200;
-    static TURN_FACTOR = 0.7;
+    static TURN_FACTOR = 1.0;
+    
+    static INIT_SPEED = 10;
 
     constructor(pos, vel) {
         this.pos = pos;
@@ -89,11 +94,13 @@ class Boid {
 
     static random() {
         const pos = Vector.bound().elMul(Vector.random());
-        const vel = Vector.random().add(Vector.scalar(-0.5)).elMul(Vector.scalar(Boid.MAX_SPEED * 2));
+        const vel = Vector.random().add(Vector.scalar(-0.5)).elMul(Vector.scalar(Boid.INIT_SPEED));
         return new Boid(pos, vel);
     }
 
-    updateVel(boids) {
+    adjustWithNeighbours(boids) {
+        // Adjusting velocity based on Boids rules
+
         const seen = boids.filter(boid => boid !== this && this.pos.dist(boid.pos) <= Boid.VISION_RANGE);
         const size = seen.length
 
@@ -117,33 +124,42 @@ class Boid {
         
         this.vel = this.vel.add(v1).add(v2).add(v3);
 
+    }
+
+    capSpeed() {
+        // Limit speed to MAX_SPEED
+
         const speed = this.vel.norm();
         if (speed > Boid.MAX_SPEED) {
             this.vel = this.vel.mul(Boid.MAX_SPEED / speed);
-        } else if (speed < Boid.MIN_SPEED) {
-            this.vel = this.vel.mul(Boid.MIN_SPEED / speed);
-        }
+        } 
+    }
 
-        if (Boid.WRAP) return;
+    keepInBounds() {
+        // Adjust velocity to keep boid within bounds
 
         this.vel = this.vel.add(
-            // this.pos
-            //     .add(new Vector(window.innerWidth / -2, window.innerHeight / -2))
-            //     .sign(new Vector(
-            //         window.innerWidth / 2 - Boid.BOUND_MARGIN,
-            //         window.innerHeight / 2 - Boid.BOUND_MARGIN,
-            //     ))
-            //     .mul(-1 * Boid.TURN_FACTOR)
             this.pos
                 .add(Vector.bound().mul(-1/2))
                 .elSign(Vector.bound().mul(1/2).add(Vector.scalar(-1 * Boid.BOUND_MARGIN)))
                 .mul(-1 * Boid.TURN_FACTOR)
-        )       
+        )  
+    }
+
+    updateVel(boids) {
+        // Update velocity of boid 
+
+        this.adjustWithNeighbours(boids);
+        this.capSpeed();
+
+        if (Boid.WRAP) return;
+
+        this.keepInBounds();
     }
 
     move() {
         const newPos = this.pos.add(this.vel) 
-        this.pos = Boid.WRAP ? newPos.mod(Vector.bound()) : newPos;
+        this.pos = Boid.WRAP ? newPos.elMod(Vector.bound()) : newPos;
     }
 }
 
@@ -170,7 +186,7 @@ const draw = (ctx, boid) => {
 }
 
 class Simulator {
-    static NUM_BOIDS = 50;
+    static NUM_BOIDS = 100;
     static INSTANCE = null;
 
     constructor() {
@@ -190,12 +206,12 @@ class Simulator {
     } 
 
     animationLoop() {
-        this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        this.boids.forEach(boid => boid.updateVel(this.boids));
-        for (let boid of this.boids) {
+        this.boids.forEach(boid => {
+            boid.updateVel(this.boids);
             boid.move();
-            draw(this.ctx, boid);
-        }
+        });
+        this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        this.boids.forEach(boid => draw(this.ctx, boid));
 
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
