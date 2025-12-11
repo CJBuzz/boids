@@ -37,15 +37,15 @@ class Vector {
         return new Vector(this.x + vec.x, this.y + vec.y);
     }
 
-    elMul(vec) {
+    mul(vec) {
         return new Vector(this.x * vec.x, this.y * vec.y);
     }
 
-    mul(scalar) {
+    scalarMul(scalar) {
         return new Vector(this.x * scalar, this.y * scalar);
     } 
 
-    elMod(vec) {
+    mod(vec) {
         return new Vector(
             ((this.x % vec.x) + vec.x) % vec.x, 
             ((this.y % vec.y) + vec.y) % vec.y
@@ -64,11 +64,58 @@ class Vector {
         return Math.atan2(this.y, this.x);
     }
     
-    elSign(threshold = Vector.ZERO) {
+    sign(threshold = Vector.ZERO) {
         return new Vector(
             Math.abs(this.x) < threshold.x ? 0 : this.x < 0 ? -1 : 1,
             Math.abs(this.y) < threshold.y ? 0 : this.y < 0 ? -1 : 1
         )
+    }
+}
+
+class Scatterer {
+    static EFFECT_RANGE = 120;
+
+    // For animation
+    static ANIMATION_SPEED = 0.01;
+    static LINEWIDTH = 3;
+    static COLOR = boidColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
+
+    constructor(pos) {
+        this.pos = pos;
+        
+        // For animation
+        this.phase = 0;
+    }
+
+    willScatter(boid) {
+        return this.pos.dist(boid.pos) < Scatterer.EFFECT_RANGE;
+    }
+
+    draw(ctx) {
+        this.phase = (this.phase + Scatterer.ANIMATION_SPEED * Math.PI) % (Math.PI / 2);
+
+        // Calculate radius based on sine wave for smooth pulse
+        const pulseValue = (Math.sin(this.phase));
+        const radius = pulseValue * (Scatterer.EFFECT_RANGE);
+        
+        // Calculate alpha based on pulse (more opaque at max radius)
+        const alpha = 0.05 + pulseValue * 0.1;
+        
+        ctx.save();
+        
+        // Circle
+        ctx.strokeStyle = Scatterer.COLOR.replace('0.1', alpha.toString());
+        ctx.lineWidth = Scatterer.LINEWIDTH;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Light glow effect
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = Scatterer.COLOR;
+        ctx.stroke();
+        
+        ctx.restore();
     }
 }
 
@@ -93,12 +140,12 @@ class Boid {
     }
 
     static random() {
-        const pos = Vector.bound().elMul(Vector.random());
-        const vel = Vector.random().add(Vector.scalar(-0.5)).elMul(Vector.scalar(Boid.INIT_SPEED));
+        const pos = Vector.bound().mul(Vector.random());
+        const vel = Vector.random().add(Vector.scalar(-0.5)).mul(Vector.scalar(Boid.INIT_SPEED));
         return new Boid(pos, vel);
     }
 
-    adjustWithNeighbours(boids) {
+    adjustWithNeighbours(boids, scatterers) {
         // Adjusting velocity based on Boids rules
 
         const seen = boids.filter(boid => boid !== this && this.pos.dist(boid.pos) <= Boid.VISION_RANGE);
@@ -107,20 +154,23 @@ class Boid {
         const avoiding = seen.filter(boid => this.pos.dist(boid.pos) <= Boid.AVOID_RANGE);
 
         if (size === 0) return;
+
+
+        const c1_mod = scatterers.some(s => s.willScatter(this)) ? -1 : 1;
         
         const v1 = seen
             .reduce((v, boid) => v.add(boid.pos), Vector.ZERO)
-            .mul(1 / size)
-            .add(this.pos.mul(-1))
-            .mul(Boid.C1);
+            .scalarMul(1 / size)
+            .add(this.pos.scalarMul(-1))
+            .scalarMul(Boid.C1 * c1_mod);
         const v2 = avoiding
-            .reduce((v, boid) => v.add(this.pos).add(boid.pos.mul(-1)), Vector.ZERO)
-            .mul(Boid.C2);
+            .reduce((v, boid) => v.add(this.pos).add(boid.pos.scalarMul(-1)), Vector.ZERO)
+            .scalarMul(Boid.C2);
         const v3 = seen
             .reduce((v, boid) => v.add(boid.vel), Vector.ZERO)
-            .mul(1 / size)
-            .add(this.vel.mul(-1))
-            .mul(Boid.C3);
+            .scalarMul(1 / size)
+            .add(this.vel.scalarMul(-1))
+            .scalarMul(Boid.C3);
         
         this.vel = this.vel.add(v1).add(v2).add(v3);
 
@@ -131,7 +181,7 @@ class Boid {
 
         const speed = this.vel.norm();
         if (speed > Boid.MAX_SPEED) {
-            this.vel = this.vel.mul(Boid.MAX_SPEED / speed);
+            this.vel = this.vel.scalarMul(Boid.MAX_SPEED / speed);
         } 
     }
 
@@ -140,16 +190,16 @@ class Boid {
 
         this.vel = this.vel.add(
             this.pos
-                .add(Vector.bound().mul(-1/2))
-                .elSign(Vector.bound().mul(1/2).add(Vector.scalar(-1 * Boid.BOUND_MARGIN)))
-                .mul(-1 * Boid.TURN_FACTOR)
+                .add(Vector.bound().scalarMul(-1/2))
+                .sign(Vector.bound().scalarMul(1/2).add(Vector.scalar(-1 * Boid.BOUND_MARGIN)))
+                .scalarMul(-1 * Boid.TURN_FACTOR)
         )  
     }
 
-    updateVel(boids) {
+    updateVel(boids, env) {
         // Update velocity of boid 
 
-        this.adjustWithNeighbours(boids);
+        this.adjustWithNeighbours(boids, env["scatterer"]);
         
         if (!Boid.WRAP) this.keepInBounds();
         this.capSpeed();
@@ -157,7 +207,7 @@ class Boid {
 
     move() {
         const newPos = this.pos.add(this.vel) 
-        this.pos = Boid.WRAP ? newPos.elMod(Vector.bound()) : newPos;
+        this.pos = Boid.WRAP ? newPos.mod(Vector.bound()) : newPos;
     }
 }
 
@@ -193,6 +243,10 @@ class Simulator {
         }
 
         this.boids = [];
+        this.env = {
+            "scatterer": [new Scatterer(new Vector(window.innerWidth / 2, window.innerHeight / 2))]
+        };
+
         this.ctx = document.getElementById("canvas").getContext("2d");
         Simulator.INSTANCE = this;
 
@@ -205,11 +259,13 @@ class Simulator {
 
     animationLoop() {
         this.boids.forEach(boid => {
-            boid.updateVel(this.boids);
+            boid.updateVel(this.boids, this.env);
             boid.move();
         });
         this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         this.boids.forEach(boid => draw(this.ctx, boid));
+
+        this.env["scatterer"].forEach(s => s.draw(this.ctx));
 
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
