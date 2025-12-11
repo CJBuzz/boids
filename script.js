@@ -150,11 +150,9 @@ class Boid {
         // Update velocity of boid 
 
         this.adjustWithNeighbours(boids);
+        
+        if (!Boid.WRAP) this.keepInBounds();
         this.capSpeed();
-
-        if (Boid.WRAP) return;
-
-        this.keepInBounds();
     }
 
     move() {
