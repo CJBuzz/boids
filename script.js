@@ -94,12 +94,9 @@ class Scatterer {
     draw(ctx) {
         this.phase = (this.phase + Scatterer.ANIMATION_SPEED * Math.PI) % (Math.PI / 2);
 
-        // Calculate radius based on sine wave for smooth pulse
-        const pulseValue = (Math.sin(this.phase));
-        const radius = pulseValue * (Scatterer.EFFECT_RANGE);
-        
-        // Calculate alpha based on pulse (more opaque at max radius)
-        const alpha = 0.05 + pulseValue * 0.1;
+        const pulse = (Math.sin(this.phase));
+        const radius = pulse * (Scatterer.EFFECT_RANGE);
+        const alpha = 0.05 + pulse * 0.1;
         
         ctx.save();
         
