@@ -122,9 +122,10 @@ class Boid {
         this.vel = vel;
     }
 
-    static random() {
-        const pos = Vector.bound().mul(Vector.random());
-        const vel = Vector.random().add(Vector.scalar(-0.5)).mul(Vector.scalar(Boid.INIT_SPEED));
+    static random(
+        pos = Vector.bound().mul(Vector.random()),
+        vel = Vector.random().add(Vector.scalar(-0.5)).mul(Vector.scalar(Boid.INIT_SPEED))
+    ) {
         return new Boid(pos, vel);
     }
 
@@ -263,6 +264,11 @@ class Simulator {
     static NUM_BOIDS = 100;
     static INSTANCE = null;
 
+    static SPAWNABLES = {
+        BOID: 0,
+        SCATTERER: 1        
+    }
+
     constructor() {
         if (Simulator.INSTANCE) {
             return Simulator.INSTANCE;
@@ -276,6 +282,8 @@ class Simulator {
         this.ctx = document.getElementById("canvas").getContext("2d");
         this.drawer = new Drawer(this.ctx);
         Simulator.INSTANCE = this;
+
+        this.spawnable = Simulator.SPAWNABLES.BOID; 
 
         for (let i = 0; i < Simulator.NUM_BOIDS; i++) {
             this.boids.push(Boid.random())
@@ -303,8 +311,17 @@ class Simulator {
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
 
-    spawnScatterer(x, y) {
-        this.env["scatterer"].push(new Scatterer(new Vector(x, y)));
+    spawn(x, y) {
+        switch(this.spawnable) {
+            case Simulator.SPAWNABLES.BOID:
+                this.boids.push(Boid.random(new Vector(x, y)));
+                break;
+            case Simulator.SPAWNABLES.SCATTERER:
+                this.env["scatterer"].push(new Scatterer(new Vector(x, y)));
+                break;
+            default:
+                console.warn("this.spawnable value does not match Spawnable enum. Nothing spawned!")
+        }
     }
 }
 
@@ -312,9 +329,8 @@ window.onload = () => {
     sim = new Simulator();
 
     window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('dblclick', e => sim.spawnScatterer(e.clientX, e.clientY));
+    window.addEventListener('click', e => sim.spawn(e.clientX, e.clientY));
     
     resizeCanvas();
     sim.run();
-    
 }
