@@ -102,6 +102,14 @@ class Scatterer {
     }
 }
 
+class Goal {
+    static defaults = {"LURE": 1}
+
+    constructor(pos) {
+        this.pos = pos
+    }
+}
+
 class Boid {
     static MAX_SPEED = 10;
     // static MIN_SPEED = 0;
@@ -129,7 +137,7 @@ class Boid {
         return new Boid(pos, vel);
     }
 
-    adjustWithNeighbours(boids, scatterers) {
+    adjustWithNeighbours(boids, env) {
         // Adjusting velocity based on Boids rules
 
         const seen = boids.filter(boid => boid !== this && this.pos.dist(boid.pos) <= Boid.VISION_RANGE);
@@ -140,7 +148,7 @@ class Boid {
         if (size === 0) return;
 
 
-        const c1_mod = scatterers.some(s => s.willScatter(this)) ? -1 : 1;
+        const c1_mod = env["scatterer"].some(s => s.willScatter(this)) ? -1 : 1;
         
         const v1 = seen
             .reduce((v, boid) => v.add(boid.pos), Vector.ZERO)
@@ -157,6 +165,13 @@ class Boid {
             .scalarMul(Boid.C3);
         
         this.vel = this.vel.add(v1).add(v2).add(v3);
+
+        if (env["goal"] == 0) return;
+
+        const goal = env["goal"][0];
+
+        const goalNudge = goal.pos.add(this.pos.scalarMul(-1)).scalarMul(Goal.defaults.LURE/1000); 
+        this.vel = this.vel.add(goalNudge);
 
     }
 
@@ -183,7 +198,7 @@ class Boid {
     updateVel(boids, env) {
         // Update velocity of boid 
 
-        this.adjustWithNeighbours(boids, env["scatterer"]);
+        this.adjustWithNeighbours(boids, env);
         
         if (!Boid.WRAP) this.keepInBounds();
         this.capSpeed();
@@ -196,6 +211,8 @@ class Boid {
 }
 
 class Drawer {
+    // Drawing Wide
+    static SHADOWBLUR = 15
 
     // For Boid
     static BOID = {
@@ -207,6 +224,18 @@ class Drawer {
         "SPEED": 0.01,
         "LINEWIDTH": 3,
         "COLOR": Drawer.BOID.COLOR.replace('rgb', 'rgba').replace(')', ', 0.1)')
+    }
+
+    // For goal
+    static GOAL = {
+        "WIDTH": 25,
+        "HEIGHT": 20,
+        "LINEWIDTH": 3,
+        "COLOR": `rgb(${
+            Drawer.BOID.COLOR.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)
+                .slice(1)
+                .map(c => Math.round(parseInt(c) * 0.65))
+                .join(', ')})`,
     }
 
     constructor(ctx) {
@@ -252,10 +281,34 @@ class Drawer {
         this.ctx.stroke();
         
         // Light glow effect
-        this.ctx.shadowBlur = 15;
+        this.ctx.shadowBlur = Drawer.SHADOWBLUR;
         this.ctx.shadowColor = Drawer.SCATTERER.COLOR;
         this.ctx.stroke();
         
+        this.ctx.restore();
+    }
+
+    drawGoal(goal) {
+        this.ctx.save();
+        this.ctx.translate(goal.pos.x, goal.pos.y);
+
+        // Flagpole
+        this.ctx.strokeStyle = Drawer.GOAL.COLOR;
+        this.ctx.lineWidth = Drawer.GOAL.LINEWIDTH;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(0, -2 * Drawer.GOAL.HEIGHT); // Short pole
+        this.ctx.stroke();
+        
+        // Pennant 
+        this.ctx.fillStyle = Drawer.GOAL.COLOR;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -2 * Drawer.GOAL.HEIGHT); 
+        this.ctx.lineTo(Drawer.GOAL.WIDTH, -1.5 * Drawer.GOAL.HEIGHT); 
+        this.ctx.lineTo(0, -Drawer.GOAL.HEIGHT); 
+        this.ctx.closePath();
+        this.ctx.fill();
+                
         this.ctx.restore();
     }
 }
@@ -266,7 +319,8 @@ class Simulator {
 
     static SPAWNABLES = {
         BOID: 0,
-        SCATTERER: 1        
+        SCATTERER: 1,
+        GOAL: 1        
     }
 
     constructor() {
@@ -276,7 +330,8 @@ class Simulator {
 
         this.boids = [];
         this.env = {
-            "scatterer": []
+            "scatterer": [],
+            "goal": [new Goal(new Vector(window.innerWidth / 2, window.innerHeight / 2))]
         };
 
         this.ctx = document.getElementById("canvas").getContext("2d");
@@ -286,8 +341,10 @@ class Simulator {
         this.spawnable = Simulator.SPAWNABLES.BOID; 
 
         for (let i = 0; i < Simulator.NUM_BOIDS; i++) {
-            this.boids.push(Boid.random())
+            this.boids.push(Boid.random());
         }
+
+        console.log(Drawer.GOAL.COLOR);
         
         return Simulator.INSTANCE;
     } 
@@ -303,6 +360,7 @@ class Simulator {
         this.boids.forEach(boid => this.drawer.drawBoid(boid));
 
         this.env["scatterer"].forEach(s => this.drawer.drawScatterer(s));
+        this.env["goal"].forEach(g => this.drawer.drawGoal(g));
 
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
@@ -318,6 +376,9 @@ class Simulator {
                 break;
             case Simulator.SPAWNABLES.SCATTERER:
                 this.env["scatterer"].push(new Scatterer(new Vector(x, y)));
+                break;
+            case Simulator.SPAWNABLES.GOAL:
+                this.env["goal"].push(new Goal(new Vector(x, y)));
                 break;
             default:
                 console.warn("this.spawnable value does not match Spawnable enum. Nothing spawned!")
