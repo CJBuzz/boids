@@ -75,11 +75,6 @@ class Vector {
 class Scatterer {
     static EFFECT_RANGE = 120;
 
-    // For animation
-    static ANIMATION_SPEED = 0.01;
-    static LINEWIDTH = 3;
-    static COLOR = boidColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
-
     constructor(pos) {
         this.pos = pos;
         
@@ -89,30 +84,6 @@ class Scatterer {
 
     willScatter(boid) {
         return this.pos.dist(boid.pos) < Scatterer.EFFECT_RANGE;
-    }
-
-    draw(ctx) {
-        this.phase = (this.phase + Scatterer.ANIMATION_SPEED * Math.PI) % (Math.PI / 2);
-
-        const pulse = (Math.sin(this.phase));
-        const radius = pulse * (Scatterer.EFFECT_RANGE);
-        const alpha = 0.05 + pulse * 0.1;
-        
-        ctx.save();
-        
-        // Circle
-        ctx.strokeStyle = Scatterer.COLOR.replace('0.1', alpha.toString());
-        ctx.lineWidth = Scatterer.LINEWIDTH;
-        ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Light glow effect
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = Scatterer.COLOR;
-        ctx.stroke();
-        
-        ctx.restore();
     }
 }
 
@@ -208,26 +179,62 @@ class Boid {
     }
 }
 
-const draw = (ctx, boid) => {
-    ctx.save();
+class Drawer {
 
-    ctx.translate(boid.pos.x, boid.pos.y)
-    ctx.rotate(boid.vel.angle());
-    
-    ctx.fillStyle = boidColor;
-    
-    // Teardrop
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.bezierCurveTo(-8, 5, -14, 6, -15, 0);
-    ctx.bezierCurveTo(-14, -6, -8, -5, 0, 0);
-    ctx.closePath();
-    ctx.fill()
-    
-    // Triangle
-    // ctx.fill(new Path2D('M0,0 L-15,5 L-15,-5 Z'));
+    // For scatterer
+    static SCATTERER_SPEED = 0.01;
+    static SCATTERER_LINEWIDTH = 3;
+    static SCATTERER_COLOR = boidColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
 
-    ctx.restore();
+    constructor(ctx) {
+        this.ctx = ctx;
+    }
+
+    drawBoid(boid) {
+        this.ctx.save();
+
+        this.ctx.translate(boid.pos.x, boid.pos.y)
+        this.ctx.rotate(boid.vel.angle());
+        
+        this.ctx.fillStyle = boidColor;
+        
+        // Teardrop
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, 0);
+        this.ctx.bezierCurveTo(-8, 5, -14, 6, -15, 0);
+        this.ctx.bezierCurveTo(-14, -6, -8, -5, 0, 0);
+        this.ctx.closePath();
+        this.ctx.fill()
+        
+        // Triangle
+        // this.ctx.fill(new Path2D('M0,0 L-15,5 L-15,-5 Z'));
+
+        this.ctx.restore();
+    }
+
+    drawScatterer(scatterer) {
+        scatterer.phase = (scatterer.phase + Drawer.SCATTERER_SPEED * Math.PI) % (Math.PI / 2);
+
+        const pulse = (Math.sin(scatterer.phase));
+        const radius = pulse * (Scatterer.EFFECT_RANGE);
+        const alpha = 0.05 + pulse * 0.1;
+        
+        this.ctx.save();
+        
+        // Circle
+        this.ctx.strokeStyle = Drawer.SCATTERER_COLOR.replace('0.1', alpha.toString());
+        this.ctx.lineWidth = Drawer.SCATTERER_LINEWIDTH;
+        this.ctx.beginPath();
+        this.ctx.arc(scatterer.pos.x, scatterer.pos.y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        // Light glow effect
+        this.ctx.shadowBlur = 15;
+        this.ctx.shadowColor = Drawer.SCATTERER_COLOR;
+        this.ctx.stroke();
+        
+        this.ctx.restore();
+    }
 }
 
 class Simulator {
@@ -245,6 +252,7 @@ class Simulator {
         };
 
         this.ctx = document.getElementById("canvas").getContext("2d");
+        this.drawer = new Drawer(this.ctx);
         Simulator.INSTANCE = this;
 
         for (let i = 0; i < Simulator.NUM_BOIDS; i++) {
@@ -260,9 +268,9 @@ class Simulator {
             boid.move();
         });
         this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        this.boids.forEach(boid => draw(this.ctx, boid));
+        this.boids.forEach(boid => this.drawer.drawBoid(boid));
 
-        this.env["scatterer"].forEach(s => s.draw(this.ctx));
+        this.env["scatterer"].forEach(s => this.drawer.drawScatterer(s));
 
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
