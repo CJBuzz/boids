@@ -1,6 +1,5 @@
 const root = document.documentElement;
 const bgColor = getComputedStyle(root).getPropertyValue('--bg-color');
-const boidColor = getComputedStyle(root).getPropertyValue('--boid-color');
 
 const getWindowDims = () => {
     return [window.innerWidth, window.innerHeight];
@@ -73,17 +72,33 @@ class Vector {
 }
 
 class Scatterer {
-    static EFFECT_RANGE = 120;
+    // Defaults
+    static defaults = {"EFFECT_RANGE": 120, "LIFESPAN": 10}
 
-    constructor(pos) {
+    constructor(pos, lifespan = Scatterer.defaults.LIFESPAN, range = Scatterer.defaults.EFFECT_RANGE) {
         this.pos = pos;
         
         // For animation
         this.phase = 0;
+
+        // For range
+        this.range = range;
+
+        // Despawning purposes
+        if (lifespan == null) {
+            this.forever = true;
+        } else {
+            this.despawnTime = new Date().getTime() + lifespan * 1000;
+            this.forever = false;
+        }
     }
 
     willScatter(boid) {
-        return this.pos.dist(boid.pos) < Scatterer.EFFECT_RANGE;
+        return this.pos.dist(boid.pos) < this.range;
+    }
+
+    checkAlive() {
+        return this.forever ? true : new Date().getTime() < this.despawnTime; 
     }
 }
 
@@ -181,10 +196,17 @@ class Boid {
 
 class Drawer {
 
+    // For Boid
+    static BOID = {
+        "COLOR": getComputedStyle(root).getPropertyValue('--boid-color')
+    }
+
     // For scatterer
-    static SCATTERER_SPEED = 0.01;
-    static SCATTERER_LINEWIDTH = 3;
-    static SCATTERER_COLOR = boidColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
+    static SCATTERER = {
+        "SPEED": 0.01,
+        "LINEWIDTH": 3,
+        "COLOR": Drawer.BOID.COLOR.replace('rgb', 'rgba').replace(')', ', 0.1)')
+    }
 
     constructor(ctx) {
         this.ctx = ctx;
@@ -196,7 +218,7 @@ class Drawer {
         this.ctx.translate(boid.pos.x, boid.pos.y)
         this.ctx.rotate(boid.vel.angle());
         
-        this.ctx.fillStyle = boidColor;
+        this.ctx.fillStyle = Drawer.BOID.COLOR;
         
         // Teardrop
         this.ctx.beginPath();
@@ -213,24 +235,24 @@ class Drawer {
     }
 
     drawScatterer(scatterer) {
-        scatterer.phase = (scatterer.phase + Drawer.SCATTERER_SPEED * Math.PI) % (Math.PI / 2);
+        scatterer.phase = (scatterer.phase + Drawer.SCATTERER.SPEED * Math.PI) % (Math.PI / 2);
 
         const pulse = (Math.sin(scatterer.phase));
-        const radius = pulse * (Scatterer.EFFECT_RANGE);
+        const radius = pulse * (scatterer.range);
         const alpha = 0.05 + pulse * 0.1;
         
         this.ctx.save();
         
         // Circle
-        this.ctx.strokeStyle = Drawer.SCATTERER_COLOR.replace('0.1', alpha.toString());
-        this.ctx.lineWidth = Drawer.SCATTERER_LINEWIDTH;
+        this.ctx.strokeStyle = Drawer.SCATTERER.COLOR.replace('0.1', alpha.toString());
+        this.ctx.lineWidth = Drawer.SCATTERER.LINEWIDTH;
         this.ctx.beginPath();
         this.ctx.arc(scatterer.pos.x, scatterer.pos.y, radius, 0, Math.PI * 2);
         this.ctx.stroke();
         
         // Light glow effect
         this.ctx.shadowBlur = 15;
-        this.ctx.shadowColor = Drawer.SCATTERER_COLOR;
+        this.ctx.shadowColor = Drawer.SCATTERER.COLOR;
         this.ctx.stroke();
         
         this.ctx.restore();
@@ -248,7 +270,7 @@ class Simulator {
 
         this.boids = [];
         this.env = {
-            "scatterer": [new Scatterer(new Vector(window.innerWidth / 2, window.innerHeight / 2))]
+            "scatterer": []
         };
 
         this.ctx = document.getElementById("canvas").getContext("2d");
@@ -263,6 +285,8 @@ class Simulator {
     } 
 
     animationLoop() {
+        this.env["scatterer"] = this.env["scatterer"].filter(s => s.checkAlive());
+
         this.boids.forEach(boid => {
             boid.updateVel(this.boids, this.env);
             boid.move();
@@ -278,10 +302,19 @@ class Simulator {
     run() {
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
+
+    spawnScatterer(x, y) {
+        this.env["scatterer"].push(new Scatterer(new Vector(x, y)));
+    }
 }
 
 window.onload = () => {
+    sim = new Simulator();
+
     window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('dblclick', e => sim.spawnScatterer(e.clientX, e.clientY));
+    
     resizeCanvas();
-    new Simulator().run();
+    sim.run();
+    
 }
