@@ -1,10 +1,32 @@
 :root {
     --bg-color: rgb(45, 40, 52);
     --boid-color: rgb(159, 85, 244);
+    --box-color: rgba(100, 65, 150, 0.9);
+    --font-color: rgb(232, 219, 247);
 }
 
 body {
     margin: 0;
     background: var(--bg-color);
     overflow: hidden;
+}
+
+#notification {
+    position: absolute;
+    top: 5%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    height: 50px;
+    width: 275px;
+    border-radius: 20px;
+    
+    background-color: var(--box-color);
+    
+    color: var(--font-color);
+    font-size: large;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 800;
+    display: none;
+    justify-content: center;
+    align-items: center;
 }

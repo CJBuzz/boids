@@ -1,16 +1,16 @@
 const root = document.documentElement;
-const bgColor = getComputedStyle(root).getPropertyValue('--bg-color');
+const bgColor = getComputedStyle(root).getPropertyValue("--bg-color");
 
 const getWindowDims = () => {
     return [window.innerWidth, window.innerHeight];
-}
+};
 
 const resizeCanvas = () => {
     const canvas = document.getElementById("canvas");
     [canvas.width, canvas.height] = getWindowDims();
     Simulator.width = canvas.width;
     Simulator.height = canvas.height;
-}
+};
 
 class Vector {
     static ZERO = new Vector(0, 0);
@@ -42,11 +42,11 @@ class Vector {
 
     scalarMul(scalar) {
         return new Vector(this.x * scalar, this.y * scalar);
-    } 
+    }
 
     mod(vec) {
         return new Vector(
-            ((this.x % vec.x) + vec.x) % vec.x, 
+            ((this.x % vec.x) + vec.x) % vec.x,
             ((this.y % vec.y) + vec.y) % vec.y
         );
     }
@@ -54,7 +54,7 @@ class Vector {
     norm() {
         return Math.sqrt(this.x ** 2 + this.y ** 2);
     }
-    
+
     dist(vec) {
         return Math.sqrt((this.x - vec.x) ** 2 + (this.y - vec.y) ** 2);
     }
@@ -66,27 +66,20 @@ class Vector {
     angle() {
         return Math.atan2(this.y, this.x);
     }
-    
+
     sign(threshold = Vector.ZERO) {
         return new Vector(
             Math.abs(this.x) < threshold.x ? 0 : this.x < 0 ? -1 : 1,
             Math.abs(this.y) < threshold.y ? 0 : this.y < 0 ? -1 : 1
-        )
+        );
     }
 }
 
-class Scatterer {
-    // Defaults
-    static defaults = {"EFFECT_RANGE": 120, "LIFESPAN": 10}
+class EnvObjs {
+    static defaults = { LIFESPAN: null };
 
-    constructor(pos, lifespan = Scatterer.defaults.LIFESPAN, range = Scatterer.defaults.EFFECT_RANGE) {
+    constructor(pos, lifespan = EnvObjs.defaults.LIFESPAN) {
         this.pos = pos;
-        
-        // For animation
-        this.phase = 0;
-
-        // For range
-        this.range = range;
 
         // Despawning purposes
         if (lifespan == null) {
@@ -97,20 +90,39 @@ class Scatterer {
         }
     }
 
-    willScatter(boid) {
-        return this.pos.dist(boid.pos) < this.range;
-    }
-
     checkAlive() {
-        return this.forever ? true : new Date().getTime() < this.despawnTime; 
+        return this.forever ? true : new Date().getTime() < this.despawnTime;
     }
 }
 
-class Goal {
-    static defaults = {"LURE": 0.001}
+class Scatterer extends EnvObjs {
+    // Defaults
+    static defaults = { EFFECT_RANGE: 120 };
 
-    constructor(pos) {
-        this.pos = pos;
+    constructor(
+        pos,
+        lifespan = EnvObjs.defaults.LIFESPAN,
+        range = Scatterer.defaults.EFFECT_RANGE
+    ) {
+        super(pos, lifespan);
+
+        // For animation
+        this.phase = 0;
+
+        // For range
+        this.range = range;
+    }
+
+    willScatter(boid) {
+        return this.pos.dist(boid.pos) < this.range;
+    }
+}
+
+class Goal extends EnvObjs {
+    static defaults = { LURE: 0.0005 };
+
+    constructor(pos, lifespan = EnvObjs.defaults.LIFESPAN) {
+        super(pos, lifespan);
     }
 
     getPrioritisationVal(boid) {
@@ -134,7 +146,7 @@ class Boid {
     static WRAP = false;
     static BOUND_MARGIN = 100;
     static TURN_FACTOR = 1.0;
-    
+
     static INIT_SPEED = 10;
 
     constructor(pos, vel) {
@@ -144,7 +156,9 @@ class Boid {
 
     static random(
         pos = Vector.bound().mul(Vector.random()),
-        vel = Vector.random().add(Vector.scalar(-0.5)).mul(Vector.scalar(Boid.INIT_SPEED))
+        vel = Vector.random()
+            .add(Vector.scalar(-0.5))
+            .mul(Vector.scalar(Boid.INIT_SPEED))
     ) {
         return new Boid(pos, vel);
     }
@@ -152,42 +166,60 @@ class Boid {
     adjustWithNeighbours(boids, env) {
         // Adjusting velocity based on Boids rules
 
-        const seen = boids.filter(boid => boid !== this && this.pos.dist(boid.pos) <= Boid.VISION_RANGE);
-        const size = seen.length
+        const seen = boids.filter(
+            (boid) =>
+                boid !== this && this.pos.dist(boid.pos) <= Boid.VISION_RANGE
+        );
+        const size = seen.length;
 
-        const avoiding = seen.filter(boid => this.pos.dist(boid.pos) <= Boid.AVOID_RANGE);
+        const avoiding = seen.filter(
+            (boid) => this.pos.dist(boid.pos) <= Boid.AVOID_RANGE
+        );
 
         if (size === 0) return;
 
+        const c1_mod = env["scatterer"].some((s) => s.willScatter(this))
+            ? -1
+            : 1;
 
-        const c1_mod = env["scatterer"].some(s => s.willScatter(this)) ? -1 : 1;
-        
         const v1 = seen
             .reduce((v, boid) => v.add(boid.pos), Vector.ZERO)
             .scalarMul(1 / size)
             .add(this.pos.scalarMul(-1))
             .scalarMul(Boid.C1 * c1_mod);
         const v2 = avoiding
-            .reduce((v, boid) => v.add(this.pos).add(boid.pos.scalarMul(-1)), Vector.ZERO)
+            .reduce(
+                (v, boid) => v.add(this.pos).add(boid.pos.scalarMul(-1)),
+                Vector.ZERO
+            )
             .scalarMul(Boid.C2);
         const v3 = seen
             .reduce((v, boid) => v.add(boid.vel), Vector.ZERO)
             .scalarMul(1 / size)
             .add(this.vel.scalarMul(-1))
             .scalarMul(Boid.C3);
-        
+
         this.vel = this.vel.add(v1).add(v2).add(v3);
+    }
+
+    adjustToGoal(env) {
+        // Adjusting to goal
 
         if (env["goal"] == 0) return;
 
-        const goal = env["goal"].reduce((acc, g) => {
-            const pVal = g.getPrioritisationVal(this);
-            return pVal > acc[0] ? [pVal, g] : acc;
-        },  [0, null])[1];
+        const goal = env["goal"].reduce(
+            (acc, g) => {
+                const pVal = g.getPrioritisationVal(this);
+                return pVal > acc[0] ? [pVal, g] : acc;
+            },
+            [0, null]
+        )[1];
 
-        const goalNudge = goal.pos.add(this.pos.scalarMul(-1)).scalarMul(Goal.defaults.LURE); 
+        const goalNudge = goal.pos
+            .add(this.pos.scalarMul(-1))
+            .scalarMul(Goal.defaults.LURE);
+
         this.vel = this.vel.add(goalNudge);
-
     }
 
     capSpeed() {
@@ -196,7 +228,7 @@ class Boid {
         const speed = this.vel.norm();
         if (speed > Boid.MAX_SPEED) {
             this.vel = this.vel.scalarMul(Boid.MAX_SPEED / speed);
-        } 
+        }
     }
 
     keepInBounds() {
@@ -204,54 +236,60 @@ class Boid {
 
         this.vel = this.vel.add(
             this.pos
-                .add(Vector.bound().scalarMul(-1/2))
-                .sign(Vector.bound().scalarMul(1/2).add(Vector.scalar(-1 * Boid.BOUND_MARGIN)))
+                .add(Vector.bound().scalarMul(-1 / 2))
+                .sign(
+                    Vector.bound()
+                        .scalarMul(1 / 2)
+                        .add(Vector.scalar(-1 * Boid.BOUND_MARGIN))
+                )
                 .scalarMul(-1 * Boid.TURN_FACTOR)
-        )  
+        );
     }
 
     updateVel(boids, env) {
-        // Update velocity of boid 
+        // Update velocity of boid
 
         this.adjustWithNeighbours(boids, env);
-        
+        this.adjustToGoal(env);
+
         if (!Boid.WRAP) this.keepInBounds();
         this.capSpeed();
     }
 
     move() {
-        const newPos = this.pos.add(this.vel) 
+        const newPos = this.pos.add(this.vel);
         this.pos = Boid.WRAP ? newPos.mod(Vector.bound()) : newPos;
     }
 }
 
 class Drawer {
     // Drawing Wide
-    static SHADOWBLUR = 15
+    static SHADOWBLUR = 15;
 
     // For Boid
     static BOID = {
-        "COLOR": getComputedStyle(root).getPropertyValue('--boid-color')
-    }
+        COLOR: getComputedStyle(root).getPropertyValue("--boid-color"),
+    };
 
     // For scatterer
     static SCATTERER = {
-        "SPEED": 0.01,
-        "LINEWIDTH": 3,
-        "COLOR": Drawer.BOID.COLOR.replace('rgb', 'rgba').replace(')', ', 0.1)')
-    }
+        SPEED: 0.01,
+        LINEWIDTH: 3,
+        COLOR: Drawer.BOID.COLOR.replace("rgb", "rgba").replace(")", ", 0.1)"),
+    };
 
     // For goal
     static GOAL = {
-        "WIDTH": 25,
-        "HEIGHT": 20,
-        "LINEWIDTH": 3,
-        "COLOR": `rgb(${
-            Drawer.BOID.COLOR.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)
-                .slice(1)
-                .map(c => Math.round(parseInt(c) * 0.65))
-                .join(', ')})`,
-    }
+        WIDTH: 25,
+        HEIGHT: 20,
+        LINEWIDTH: 3,
+        COLOR: `rgb(${Drawer.BOID.COLOR.match(
+            /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/
+        )
+            .slice(1)
+            .map((c) => Math.round(parseInt(c) * 0.65))
+            .join(", ")})`,
+    };
 
     constructor(ctx) {
         this.ctx = ctx;
@@ -260,19 +298,19 @@ class Drawer {
     drawBoid(boid) {
         this.ctx.save();
 
-        this.ctx.translate(boid.pos.x, boid.pos.y)
+        this.ctx.translate(boid.pos.x, boid.pos.y);
         this.ctx.rotate(boid.vel.angle());
-        
+
         this.ctx.fillStyle = Drawer.BOID.COLOR;
-        
+
         // Teardrop
         this.ctx.beginPath();
         this.ctx.moveTo(0, 0);
         this.ctx.bezierCurveTo(-8, 5, -14, 6, -15, 0);
         this.ctx.bezierCurveTo(-14, -6, -8, -5, 0, 0);
         this.ctx.closePath();
-        this.ctx.fill()
-        
+        this.ctx.fill();
+
         // Triangle
         // this.ctx.fill(new Path2D('M0,0 L-15,5 L-15,-5 Z'));
 
@@ -280,26 +318,31 @@ class Drawer {
     }
 
     drawScatterer(scatterer) {
-        scatterer.phase = (scatterer.phase + Drawer.SCATTERER.SPEED * Math.PI) % (Math.PI / 2);
+        scatterer.phase =
+            (scatterer.phase + Drawer.SCATTERER.SPEED * Math.PI) %
+            (Math.PI / 2);
 
-        const pulse = (Math.sin(scatterer.phase));
-        const radius = pulse * (scatterer.range);
+        const pulse = Math.sin(scatterer.phase);
+        const radius = pulse * scatterer.range;
         const alpha = 0.05 + pulse * 0.1;
-        
+
         this.ctx.save();
-        
+
         // Circle
-        this.ctx.strokeStyle = Drawer.SCATTERER.COLOR.replace('0.1', alpha.toString());
+        this.ctx.strokeStyle = Drawer.SCATTERER.COLOR.replace(
+            "0.1",
+            alpha.toString()
+        );
         this.ctx.lineWidth = Drawer.SCATTERER.LINEWIDTH;
         this.ctx.beginPath();
         this.ctx.arc(scatterer.pos.x, scatterer.pos.y, radius, 0, Math.PI * 2);
         this.ctx.stroke();
-        
+
         // Light glow effect
         this.ctx.shadowBlur = Drawer.SHADOWBLUR;
         this.ctx.shadowColor = Drawer.SCATTERER.COLOR;
         this.ctx.stroke();
-        
+
         this.ctx.restore();
     }
 
@@ -314,16 +357,16 @@ class Drawer {
         this.ctx.moveTo(0, 0);
         this.ctx.lineTo(0, -2 * Drawer.GOAL.HEIGHT); // Short pole
         this.ctx.stroke();
-        
-        // Pennant 
+
+        // Pennant
         this.ctx.fillStyle = Drawer.GOAL.COLOR;
         this.ctx.beginPath();
-        this.ctx.moveTo(0, -2 * Drawer.GOAL.HEIGHT); 
-        this.ctx.lineTo(Drawer.GOAL.WIDTH, -1.5 * Drawer.GOAL.HEIGHT); 
-        this.ctx.lineTo(0, -Drawer.GOAL.HEIGHT); 
+        this.ctx.moveTo(0, -2 * Drawer.GOAL.HEIGHT);
+        this.ctx.lineTo(Drawer.GOAL.WIDTH, -1.5 * Drawer.GOAL.HEIGHT);
+        this.ctx.lineTo(0, -Drawer.GOAL.HEIGHT);
         this.ctx.closePath();
         this.ctx.fill();
-                
+
         this.ctx.restore();
     }
 }
@@ -333,10 +376,18 @@ class Simulator {
     static INSTANCE = null;
 
     static SPAWNABLES = {
-        BOID: 0,
-        SCATTERER: 1,
-        GOAL: 1        
-    }
+        VIEW: 0,
+        BOID: 1,
+        SCATTERER: 2,
+        GOAL: 3,
+    };
+    static ALERT_TEXT = [
+        "View",
+        "Click to add boids",
+        "Click to add scatterers",
+        "Click to add goals",
+    ];
+    static NUM_SPAWANABLES = Object.keys(Simulator.SPAWNABLES).length;
 
     constructor() {
         if (Simulator.INSTANCE) {
@@ -345,38 +396,43 @@ class Simulator {
 
         this.boids = [];
         this.env = {
-            "scatterer": [],
-            "goal": [
-                new Goal(new Vector(window.innerWidth / 4, window.innerHeight / 4)),
-                new Goal(new Vector(window.innerWidth * 3 / 4, window.innerHeight * 3 /4))
-            ]
+            scatterer: [],
+            goal: [],
         };
 
         this.ctx = document.getElementById("canvas").getContext("2d");
         this.drawer = new Drawer(this.ctx);
         Simulator.INSTANCE = this;
 
-        this.spawnable = Simulator.SPAWNABLES.BOID; 
+        // Toggling modes
+        this.spawnable = Simulator.SPAWNABLES.VIEW;
+        this.notifEl = document.getElementById("notification");
+        this.notifTimer = null;
 
         for (let i = 0; i < Simulator.NUM_BOIDS; i++) {
             this.boids.push(Boid.random());
         }
-        
+
         return Simulator.INSTANCE;
-    } 
+    }
 
     animationLoop() {
-        this.env["scatterer"] = this.env["scatterer"].filter(s => s.checkAlive());
+        Object.keys(this.env).forEach(
+            (type) =>
+                (this.env[type] = this.env[type].filter((obj) =>
+                    obj.checkAlive()
+                ))
+        );
 
-        this.boids.forEach(boid => {
+        this.boids.forEach((boid) => {
             boid.updateVel(this.boids, this.env);
             boid.move();
         });
         this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        this.boids.forEach(boid => this.drawer.drawBoid(boid));
+        this.boids.forEach((boid) => this.drawer.drawBoid(boid));
 
-        this.env["scatterer"].forEach(s => this.drawer.drawScatterer(s));
-        this.env["goal"].forEach(g => this.drawer.drawGoal(g));
+        this.env["scatterer"].forEach((s) => this.drawer.drawScatterer(s));
+        this.env["goal"].forEach((g) => this.drawer.drawGoal(g));
 
         window.requestAnimationFrame(this.animationLoop.bind(this));
     }
@@ -386,7 +442,9 @@ class Simulator {
     }
 
     spawn(x, y) {
-        switch(this.spawnable) {
+        switch (this.spawnable) {
+            case Simulator.SPAWNABLES.VIEW:
+                break;
             case Simulator.SPAWNABLES.BOID:
                 this.boids.push(Boid.random(new Vector(x, y)));
                 break;
@@ -397,17 +455,36 @@ class Simulator {
                 this.env["goal"].push(new Goal(new Vector(x, y)));
                 break;
             default:
-                console.warn("this.spawnable value does not match Spawnable enum. Nothing spawned!")
+                console.warn(
+                    "this.spawnable value does not match Spawnable enum. Nothing spawned!"
+                );
         }
+    }
+
+    toggleSpawnOption() {
+        this.spawnable = (this.spawnable + 1) % Simulator.NUM_SPAWANABLES;
+
+        clearTimeout(this.notifTimer);
+
+        this.notifEl.innerText = Simulator.ALERT_TEXT[this.spawnable];
+        this.notifEl.style.display = "flex";
+        this.notifTimer = setTimeout(() => {
+            this.notifEl.style.display = "none";
+        }, 5000);
     }
 }
 
 window.onload = () => {
-    sim = new Simulator();
+    const sim = new Simulator();
 
-    window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('click', e => sim.spawn(e.clientX, e.clientY));
-    
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("click", (e) => sim.spawn(e.clientX, e.clientY));
+    window.addEventListener("keydown", (e) => {
+        if (e.code !== "Space") return;
+        e.preventDefault();
+        sim.toggleSpawnOption();
+    });
+
     resizeCanvas();
     sim.run();
-}
+};
