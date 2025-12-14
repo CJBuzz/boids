@@ -59,6 +59,10 @@ class Vector {
         return Math.sqrt((this.x - vec.x) ** 2 + (this.y - vec.y) ** 2);
     }
 
+    dot(vec) {
+        return this.x * vec.x + this.y * vec.y;
+    }
+
     angle() {
         return Math.atan2(this.y, this.x);
     }
@@ -106,7 +110,15 @@ class Goal {
     static defaults = {"LURE": 0.001}
 
     constructor(pos) {
-        this.pos = pos
+        this.pos = pos;
+    }
+
+    getPrioritisationVal(boid) {
+        const diffVec = this.pos.add(boid.pos.scalarMul(-1));
+        const distToGoal = diffVec.norm();
+        const cosTheta = diffVec.dot(boid.vel) / distToGoal / boid.vel.norm();
+
+        return (cosTheta + 1) * distToGoal;
     }
 }
 
@@ -168,7 +180,10 @@ class Boid {
 
         if (env["goal"] == 0) return;
 
-        const goal = env["goal"][0];
+        const goal = env["goal"].reduce((acc, g) => {
+            const pVal = g.getPrioritisationVal(this);
+            return pVal > acc[0] ? [pVal, g] : acc;
+        },  [0, null])[1];
 
         const goalNudge = goal.pos.add(this.pos.scalarMul(-1)).scalarMul(Goal.defaults.LURE); 
         this.vel = this.vel.add(goalNudge);
@@ -331,7 +346,10 @@ class Simulator {
         this.boids = [];
         this.env = {
             "scatterer": [],
-            "goal": [new Goal(new Vector(window.innerWidth / 2, window.innerHeight / 2))]
+            "goal": [
+                new Goal(new Vector(window.innerWidth / 4, window.innerHeight / 4)),
+                new Goal(new Vector(window.innerWidth * 3 / 4, window.innerHeight * 3 /4))
+            ]
         };
 
         this.ctx = document.getElementById("canvas").getContext("2d");
@@ -343,8 +361,6 @@ class Simulator {
         for (let i = 0; i < Simulator.NUM_BOIDS; i++) {
             this.boids.push(Boid.random());
         }
-
-        console.log(Drawer.GOAL.COLOR);
         
         return Simulator.INSTANCE;
     } 
