@@ -103,7 +103,7 @@ class Scatterer {
 }
 
 class Goal {
-    static defaults = {"LURE": 1}
+    static defaults = {"LURE": 0.001}
 
     constructor(pos) {
         this.pos = pos
@@ -120,7 +120,7 @@ class Boid {
     static C3 = 0.05; // factor for matching velocity
 
     static WRAP = false;
-    static BOUND_MARGIN = 200;
+    static BOUND_MARGIN = 100;
     static TURN_FACTOR = 1.0;
     
     static INIT_SPEED = 10;
@@ -170,7 +170,7 @@ class Boid {
 
         const goal = env["goal"][0];
 
-        const goalNudge = goal.pos.add(this.pos.scalarMul(-1)).scalarMul(Goal.defaults.LURE/1000); 
+        const goalNudge = goal.pos.add(this.pos.scalarMul(-1)).scalarMul(Goal.defaults.LURE); 
         this.vel = this.vel.add(goalNudge);
 
     }
