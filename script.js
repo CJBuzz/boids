@@ -1,19 +1,9 @@
 const root = document.documentElement;
 const bgColor = getComputedStyle(root).getPropertyValue("--bg-color");
 
-const getWindowDims = () => {
-    return [window.innerWidth, window.innerHeight];
-};
-
-const resizeCanvas = () => {
-    const canvas = document.getElementById("canvas");
-    [canvas.width, canvas.height] = getWindowDims();
-    Simulator.width = canvas.width;
-    Simulator.height = canvas.height;
-};
-
 class Vector {
     static ZERO = new Vector(0, 0);
+    static BOUND = null;
 
     constructor(x, y) {
         this.x = x;
@@ -29,7 +19,8 @@ class Vector {
     }
 
     static bound() {
-        return new Vector(window.innerWidth, window.innerHeight);
+        if (Vector.BOUND === null) console.error("Bound undefined!");
+        return Vector.BOUND;
     }
 
     add(vec) {
@@ -82,7 +73,7 @@ class EnvObjs {
         this.pos = pos;
 
         // Despawning purposes
-        if (lifespan == null) {
+        if (lifespan === null) {
             this.forever = true;
         } else {
             this.despawnTime = new Date().getTime() + lifespan * 1000;
@@ -147,8 +138,6 @@ class Boid {
     static BOUND_MARGIN = 100;
     static TURN_FACTOR = 1.0;
 
-    static INIT_SPEED = 10;
-
     constructor(pos, vel) {
         this.pos = pos;
         this.vel = vel;
@@ -158,7 +147,7 @@ class Boid {
         pos = Vector.bound().mul(Vector.random()),
         vel = Vector.random()
             .add(Vector.scalar(-0.5))
-            .mul(Vector.scalar(Boid.INIT_SPEED))
+            .mul(Vector.scalar(Boid.MAX_SPEED))
     ) {
         return new Boid(pos, vel);
     }
@@ -205,7 +194,7 @@ class Boid {
     adjustToGoal(env) {
         // Adjusting to goal
 
-        if (env["goal"] == 0) return;
+        if (env["goal"].length === 0) return;
 
         const goal = env["goal"].reduce(
             (acc, g) => {
@@ -400,8 +389,17 @@ class Simulator {
             goal: [],
         };
 
-        this.ctx = document.getElementById("canvas").getContext("2d");
+        const canvasEl = document.getElementById("canvas");
+        // console.log(window.innerWidth, window.innerHeight)
+        canvasEl.width = window.innerWidth;
+        canvasEl.height = window.innerHeight;
+
+        this.ctx = canvasEl.getContext("2d");
         this.drawer = new Drawer(this.ctx);
+
+        this.bounds = { "width" : canvasEl.width, "height": canvasEl.height };
+        Vector.BOUND = new Vector(canvasEl.width, canvasEl.height);
+
         Simulator.INSTANCE = this;
 
         // Toggling modes
@@ -430,7 +428,7 @@ class Simulator {
             boid.updateVel(this.boids, this.env);
             boid.move();
         });
-        this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        this.ctx.clearRect(0, 0, this.bounds.width , this.bounds.height);
         this.boids.forEach((boid) => this.drawer.drawBoid(boid));
 
         this.env["scatterer"].forEach((s) => this.drawer.drawScatterer(s));
@@ -479,7 +477,6 @@ class Simulator {
 window.onload = () => {
     const sim = new Simulator();
 
-    window.addEventListener("resize", resizeCanvas);
     window.addEventListener("click", (e) => sim.spawn(e.clientX, e.clientY));
     window.addEventListener("keydown", (e) => {
         if (e.code !== "Space") return;
@@ -487,6 +484,5 @@ window.onload = () => {
         sim.toggleSpawnOption();
     });
 
-    resizeCanvas();
     sim.run();
 };
