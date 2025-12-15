@@ -390,14 +390,13 @@ class Simulator {
         };
 
         const canvasEl = document.getElementById("canvas");
-        // console.log(window.innerWidth, window.innerHeight)
         canvasEl.width = window.innerWidth;
         canvasEl.height = window.innerHeight;
 
         this.ctx = canvasEl.getContext("2d");
         this.drawer = new Drawer(this.ctx);
 
-        this.bounds = { "width" : canvasEl.width, "height": canvasEl.height };
+        this.bounds = { width: canvasEl.width, height: canvasEl.height };
         Vector.BOUND = new Vector(canvasEl.width, canvasEl.height);
 
         Simulator.INSTANCE = this;
@@ -428,7 +427,7 @@ class Simulator {
             boid.updateVel(this.boids, this.env);
             boid.move();
         });
-        this.ctx.clearRect(0, 0, this.bounds.width , this.bounds.height);
+        this.ctx.clearRect(0, 0, this.bounds.width, this.bounds.height);
         this.boids.forEach((boid) => this.drawer.drawBoid(boid));
 
         this.env["scatterer"].forEach((s) => this.drawer.drawScatterer(s));

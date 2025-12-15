@@ -23,17 +23,17 @@ body {
     height: 50px;
     width: 275px;
     border-radius: 20px;
-    
+
     background-color: var(--box-color);
-    
+
     color: var(--font-color);
     font-size: large;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: "Courier New", Courier, monospace;
     font-weight: 800;
     display: flex;
     justify-content: center;
     align-items: center;
-    
+
     opacity: 1;
     transition: opacity 0.3s ease-in-out;
 }
