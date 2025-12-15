@@ -407,7 +407,9 @@ class Simulator {
         // Toggling modes
         this.spawnable = Simulator.SPAWNABLES.VIEW;
         this.notifEl = document.getElementById("notification");
-        this.notifTimer = null;
+        this.notifTimer = setTimeout(() => {
+            this.notifEl.style.opacity = 0;
+        }, 5000);
 
         for (let i = 0; i < Simulator.NUM_BOIDS; i++) {
             this.boids.push(Boid.random());
@@ -467,9 +469,9 @@ class Simulator {
         clearTimeout(this.notifTimer);
 
         this.notifEl.innerText = Simulator.ALERT_TEXT[this.spawnable];
-        this.notifEl.style.display = "flex";
+        this.notifEl.style.opacity = 1;
         this.notifTimer = setTimeout(() => {
-            this.notifEl.style.display = "none";
+            this.notifEl.style.opacity = 0;
         }, 5000);
     }
 }
