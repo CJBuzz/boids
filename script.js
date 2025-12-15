@@ -365,10 +365,10 @@ class Simulator {
     static INSTANCE = null;
 
     static SPAWNABLES = {
-        VIEW: 0,
-        BOID: 1,
-        SCATTERER: 2,
-        GOAL: 3,
+        VIEW: 0, // View, clicking does nothing
+        BOID: 1, // Click to spawn boids
+        SCATTERER: 2, // Click to spawn scatterers
+        GOAL: 3, // Click to spawn goals
     };
     static ALERT_TEXT = [
         "View",
@@ -377,6 +377,7 @@ class Simulator {
         "Click to add goals",
     ];
     static NUM_SPAWANABLES = Object.keys(Simulator.SPAWNABLES).length;
+    static DESPAWN_DIST = 30;
 
     constructor() {
         if (Simulator.INSTANCE) {
@@ -460,6 +461,28 @@ class Simulator {
         }
     }
 
+    despawn(x, y) {
+        switch (this.spawnable) {
+            case Simulator.SPAWNABLES.VIEW:
+            case Simulator.SPAWNABLES.BOID:
+                break;
+            case Simulator.SPAWNABLES.SCATTERER:
+                this.env["scatterer"] = this.env["scatterer"].filter(
+                    (s) => s.pos.dist(new Vector(x, y)) > Simulator.DESPAWN_DIST
+                );
+                break;
+            case Simulator.SPAWNABLES.GOAL:
+                this.env["goal"] = this.env["goal"].filter(
+                    (g) => g.pos.dist(new Vector(x, y)) > Simulator.DESPAWN_DIST
+                );
+                break;
+            default:
+                console.warn(
+                    "this.spawnable value does not match Spawnable enum. Nothing despawned!"
+                );
+        }
+    }
+
     toggleSpawnOption() {
         this.spawnable = (this.spawnable + 1) % Simulator.NUM_SPAWANABLES;
 
@@ -476,7 +499,10 @@ class Simulator {
 window.onload = () => {
     const sim = new Simulator();
 
-    window.addEventListener("click", (e) => sim.spawn(e.clientX, e.clientY));
+    window.addEventListener("click", (e) => {
+        if (e.ctrlKey) sim.despawn(e.clientX, e.clientY);
+        else sim.spawn(e.clientX, e.clientY);
+    });
     window.addEventListener("keydown", (e) => {
         if (e.code !== "Space") return;
         e.preventDefault();

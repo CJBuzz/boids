@@ -25,7 +25,7 @@ Press `spacebar` to toggle between these modes:
 
 _(If I remember)_
 
--   [ ] Add ability to remove goals and scatterers
+-   [x] Add ability to remove goals and scatterers
 -   [ ] Add environmental obstacles that boids try to avoid
 -   [ ] More efficient methods to locate neighbouring boids
 -   [ ] Try out 3D simulation
