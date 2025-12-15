@@ -16,10 +16,19 @@ More details can be found on Conrad Parker's [post](http://www.kfish.org/boids/p
 
 Press `spacebar` to toggle between these modes:
 
--   **View** - clicking won't do anything.
--   **Add boids** - click to add more boids at mouse position (initially has 100 boids).
--   **Add scatterers** - click to add a scatterer; boids within the scatterer's zone will move away from each other (negation of [rule 1](#boid-rules)).
--   **Add goals** - click to add a goal that boids will move towards.
+-   **View**  
+    - Clicking won't do anything.
+-   **Add boids**
+    - Click to add more boids at mouse position (initially has 100 boids).
+-   **Add scatterers** 
+    - Click to add a scatterer; boids within the scatterer's zone will move away from each other (negation of [rule 1](#boid-rules)).
+    - `Ctrl` + click to remove nearby scatterers.
+-   **Add goals** 
+    - Click to add a goal that boids will move towards.
+    - `Ctrl` + click to remove nearby goals.
+
+
+Note on removal: click close to the center of environmental object.
 
 ### To-do
 
