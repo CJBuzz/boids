@@ -87,7 +87,6 @@ class EnvObjs {
 }
 
 class Scatterer extends EnvObjs {
-    // Defaults
     static defaults = { EFFECT_RANGE: 120 };
 
     constructor(
@@ -122,6 +121,20 @@ class Goal extends EnvObjs {
         const cosTheta = diffVec.dot(boid.vel) / distToGoal / boid.vel.norm();
 
         return (cosTheta + 1) * distToGoal;
+    }
+}
+
+class Obstacle extends EnvObjs {
+    static defaults = { SIZE: 40, AVOID_RANGE: 40 };
+    static DIST_FROM_CENTER =
+        Obstacle.defaults.SIZE + Obstacle.defaults.AVOID_RANGE;
+
+    constructor(pos, lifespan = EnvObjs.defaults.LIFESPAN) {
+        super(pos, lifespan);
+    }
+
+    willAvoid(boid) {
+        return boid.pos.dist(this.pos) < Obstacle.DIST_FROM_CENTER;
     }
 }
 
@@ -211,6 +224,25 @@ class Boid {
         this.vel = this.vel.add(goalNudge);
     }
 
+    adjustFromObstacle(env) {
+        // Adjusting away from obstacles.
+
+        const relevantObstacles = env["obstacle"].filter((o) =>
+            o.willAvoid(this)
+        );
+
+        if (relevantObstacles.length === 0) return;
+
+        const obstNudge = relevantObstacles
+            .reduce(
+                (v, o) => v.add(this.pos.add(o.pos.scalarMul(-1))),
+                Vector.ZERO
+            )
+            .scalarMul(Boid.C2);
+
+        this.vel = this.vel.add(obstNudge);
+    }
+
     capSpeed() {
         // Limit speed to MAX_SPEED
 
@@ -240,6 +272,7 @@ class Boid {
 
         this.adjustWithNeighbours(boids, env);
         this.adjustToGoal(env);
+        this.adjustFromObstacle(env);
 
         if (!Boid.WRAP) this.keepInBounds();
         this.capSpeed();
@@ -258,6 +291,11 @@ class Drawer {
     // For Boid
     static BOID = {
         COLOR: getComputedStyle(root).getPropertyValue("--boid-color"),
+    };
+
+    // For Obstacle
+    static OBSTAClE = {
+        COLOR: Drawer.BOID.COLOR,
     };
 
     // For scatterer
@@ -304,6 +342,19 @@ class Drawer {
         // this.ctx.fill(new Path2D('M0,0 L-15,5 L-15,-5 Z'));
 
         this.ctx.restore();
+    }
+
+    drawObstacle(obstacle) {
+        this.ctx.beginPath();
+        this.ctx.arc(
+            obstacle.pos.x,
+            obstacle.pos.y,
+            Obstacle.defaults.SIZE,
+            0,
+            Math.PI * 2
+        ); // Full circle
+        this.ctx.fillStyle = Drawer.OBSTAClE.COLOR;
+        this.ctx.fill();
     }
 
     drawScatterer(scatterer) {
@@ -367,12 +418,14 @@ class Simulator {
     static SPAWNABLES = {
         VIEW: 0, // View, clicking does nothing
         BOID: 1, // Click to spawn boids
-        SCATTERER: 2, // Click to spawn scatterers
-        GOAL: 3, // Click to spawn goals
+        OBSTACLE: 2, // Click to spawn obstacles
+        SCATTERER: 3, // Click to spawn scatterers
+        GOAL: 4, // Click to spawn goals
     };
     static ALERT_TEXT = [
         "View",
         "Click to add boids",
+        "Click to add obstacles",
         "Click to add scatterers",
         "Click to add goals",
     ];
@@ -386,6 +439,11 @@ class Simulator {
 
         this.boids = [];
         this.env = {
+            obstacle: [
+                new Obstacle(
+                    new Vector(window.innerWidth / 2, window.innerHeight / 2)
+                ),
+            ],
             scatterer: [],
             goal: [],
         };
@@ -431,6 +489,7 @@ class Simulator {
         this.ctx.clearRect(0, 0, this.bounds.width, this.bounds.height);
         this.boids.forEach((boid) => this.drawer.drawBoid(boid));
 
+        this.env["obstacle"].forEach((o) => this.drawer.drawObstacle(o));
         this.env["scatterer"].forEach((s) => this.drawer.drawScatterer(s));
         this.env["goal"].forEach((g) => this.drawer.drawGoal(g));
 
@@ -447,6 +506,9 @@ class Simulator {
                 break;
             case Simulator.SPAWNABLES.BOID:
                 this.boids.push(Boid.random(new Vector(x, y)));
+                break;
+            case Simulator.SPAWNABLES.OBSTACLE:
+                this.env["obstacle"].push(new Obstacle(new Vector(x, y)));
                 break;
             case Simulator.SPAWNABLES.SCATTERER:
                 this.env["scatterer"].push(new Scatterer(new Vector(x, y)));
@@ -465,6 +527,11 @@ class Simulator {
         switch (this.spawnable) {
             case Simulator.SPAWNABLES.VIEW:
             case Simulator.SPAWNABLES.BOID:
+                break;
+            case Simulator.SPAWNABLES.OBSTACLE:
+                this.env["obstacle"] = this.env["obstacle"].filter(
+                    (o) => o.pos.dist(new Vector(x, y)) > Simulator.DESPAWN_DIST
+                );
                 break;
             case Simulator.SPAWNABLES.SCATTERER:
                 this.env["scatterer"] = this.env["scatterer"].filter(
