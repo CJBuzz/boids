@@ -293,22 +293,34 @@ class Boid {
 class Drawer {
     // Drawing Wide
     static SHADOWBLUR = 15;
+    static PRIMARY_SHADE =
+        getComputedStyle(root).getPropertyValue("--boid-color");
+    static SECONDARY_SHADE = `rgb(${Drawer.PRIMARY_SHADE.match(
+        /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/
+    )
+        .slice(1)
+        .map((c) => Math.round(parseInt(c) * 0.65))
+        .join(", ")})`;
 
     // For Boid
     static BOID = {
-        COLOR: getComputedStyle(root).getPropertyValue("--boid-color"),
+        COLOR: Drawer.PRIMARY_SHADE,
     };
 
     // For Obstacle
     static OBSTAClE = {
-        COLOR: Drawer.BOID.COLOR.replace("rgb", "rgba").replace(")", ", 0.4)"),
+        BORDER_COLOR: Drawer.PRIMARY_SHADE,
+        COLOR: Drawer.SECONDARY_SHADE,
     };
 
     // For scatterer
     static SCATTERER = {
         SPEED: 0.01,
         LINEWIDTH: 3,
-        COLOR: Drawer.BOID.COLOR.replace("rgb", "rgba").replace(")", ", 0.1)"),
+        COLOR: Drawer.PRIMARY_SHADE.replace("rgb", "rgba").replace(
+            ")",
+            ", 0.1)"
+        ),
     };
 
     // For goal
@@ -316,12 +328,7 @@ class Drawer {
         WIDTH: 25,
         HEIGHT: 20,
         LINEWIDTH: 3,
-        COLOR: `rgb(${Drawer.BOID.COLOR.match(
-            /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/
-        )
-            .slice(1)
-            .map((c) => Math.round(parseInt(c) * 0.65))
-            .join(", ")})`,
+        COLOR: Drawer.SECONDARY_SHADE,
     };
 
     constructor(ctx) {
@@ -343,9 +350,6 @@ class Drawer {
         this.ctx.bezierCurveTo(-14, -6, -8, -5, 0, 0);
         this.ctx.closePath();
         this.ctx.fill();
-
-        // Triangle
-        // this.ctx.fill(new Path2D('M0,0 L-15,5 L-15,-5 Z'));
 
         this.ctx.restore();
     }
@@ -407,9 +411,9 @@ class Drawer {
         // Pennant
         this.ctx.fillStyle = Drawer.GOAL.COLOR;
         this.ctx.beginPath();
-        this.ctx.moveTo(0, -2 * Drawer.GOAL.HEIGHT);
+        this.ctx.moveTo(Drawer.GOAL.LINEWIDTH / 2, -2 * Drawer.GOAL.HEIGHT);
         this.ctx.lineTo(Drawer.GOAL.WIDTH, -1.5 * Drawer.GOAL.HEIGHT);
-        this.ctx.lineTo(0, -Drawer.GOAL.HEIGHT);
+        this.ctx.lineTo(Drawer.GOAL.LINEWIDTH / 2, -Drawer.GOAL.HEIGHT);
         this.ctx.closePath();
         this.ctx.fill();
 
