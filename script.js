@@ -125,16 +125,15 @@ class Goal extends EnvObjs {
 }
 
 class Obstacle extends EnvObjs {
-    static defaults = { SIZE: 40, AVOID_RANGE: 40 };
-    static DIST_FROM_CENTER =
-        Obstacle.defaults.SIZE + Obstacle.defaults.AVOID_RANGE;
+    static defaults = { SIZE: 40, AVOID_RANGE: 35 };
+    static REACTION_DIST = Obstacle.defaults.SIZE + Obstacle.defaults.AVOID_RANGE;
 
     constructor(pos, lifespan = EnvObjs.defaults.LIFESPAN) {
         super(pos, lifespan);
     }
 
     willAvoid(boid) {
-        return boid.pos.dist(this.pos) < Obstacle.DIST_FROM_CENTER;
+        return boid.pos.dist(this.pos) < Obstacle.REACTION_DIST;
     }
 }
 
@@ -235,10 +234,19 @@ class Boid {
 
         const obstNudge = relevantObstacles
             .reduce(
-                (v, o) => v.add(this.pos.add(o.pos.scalarMul(-1))),
+                (v, o) => {
+                    const diffVec = o.pos.add(this.pos.scalarMul(-1));
+                    const dotProduct = this.vel.dot(diffVec);
+
+                    if (dotProduct < 0) return Vector.ZERO;
+                    
+                    const proj_vel_diff = diffVec.scalarMul(dotProduct / diffVec.dot(diffVec));
+                    const shadeVec = this.vel.add(proj_vel_diff.scalarMul(-1));
+                    return v.add(shadeVec.scalarMul(this.vel.norm() / shadeVec.norm())); 
+                },
                 Vector.ZERO
             )
-            .scalarMul(Boid.C2);
+            // .scalarMul(Boid.C2);
 
         this.vel = this.vel.add(obstNudge);
     }
@@ -295,7 +303,7 @@ class Drawer {
 
     // For Obstacle
     static OBSTAClE = {
-        COLOR: Drawer.BOID.COLOR,
+        COLOR: Drawer.BOID.COLOR.replace("rgb", "rgba").replace(")", ", 0.4)"),
     };
 
     // For scatterer
