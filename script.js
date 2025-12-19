@@ -126,7 +126,8 @@ class Goal extends EnvObjs {
 
 class Obstacle extends EnvObjs {
     static defaults = { SIZE: 40, AVOID_RANGE: 35 };
-    static REACTION_DIST = Obstacle.defaults.SIZE + Obstacle.defaults.AVOID_RANGE;
+    static REACTION_DIST =
+        Obstacle.defaults.SIZE + Obstacle.defaults.AVOID_RANGE;
 
     constructor(pos, lifespan = EnvObjs.defaults.LIFESPAN) {
         super(pos, lifespan);
@@ -232,21 +233,18 @@ class Boid {
 
         if (relevantObstacles.length === 0) return;
 
-        const obstNudge = relevantObstacles
-            .reduce(
-                (v, o) => {
-                    const diffVec = o.pos.add(this.pos.scalarMul(-1));
-                    const dotProduct = this.vel.dot(diffVec);
+        const obstNudge = relevantObstacles.reduce((v, o) => {
+            const diffVec = o.pos.add(this.pos.scalarMul(-1));
+            const dotProduct = this.vel.dot(diffVec);
 
-                    if (dotProduct < 0) return Vector.ZERO;
-                    
-                    const proj_vel_diff = diffVec.scalarMul(dotProduct / diffVec.dot(diffVec));
-                    const shadeVec = this.vel.add(proj_vel_diff.scalarMul(-1));
-                    return v.add(shadeVec.scalarMul(this.vel.norm() / shadeVec.norm())); 
-                },
-                Vector.ZERO
-            )
-            // .scalarMul(Boid.C2);
+            if (dotProduct < 0) return Vector.ZERO;
+
+            const proj_vel_diff = diffVec.scalarMul(
+                dotProduct / diffVec.dot(diffVec)
+            );
+            const shadeVec = this.vel.add(proj_vel_diff.scalarMul(-1));
+            return v.add(shadeVec.scalarMul(this.vel.norm() / shadeVec.norm()));
+        }, Vector.ZERO);
 
         this.vel = this.vel.add(obstNudge);
     }
@@ -423,21 +421,15 @@ class Simulator {
     static NUM_BOIDS = 100;
     static INSTANCE = null;
 
-    static SPAWNABLES = {
+    static MODE_ENUM = {
         VIEW: 0, // View, clicking does nothing
         BOID: 1, // Click to spawn boids
         OBSTACLE: 2, // Click to spawn obstacles
         SCATTERER: 3, // Click to spawn scatterers
         GOAL: 4, // Click to spawn goals
     };
-    static ALERT_TEXT = [
-        "View",
-        "Click to add boids",
-        "Click to add obstacles",
-        "Click to add scatterers",
-        "Click to add goals",
-    ];
-    static NUM_SPAWANABLES = Object.keys(Simulator.SPAWNABLES).length;
+    static SPAWANABLE = ["boid", "obstacle", "scatterer", "goal"];
+    static NUM_MODES = Object.keys(Simulator.MODE_ENUM).length;
     static DESPAWN_DIST = 30;
 
     constructor() {
@@ -447,11 +439,7 @@ class Simulator {
 
         this.boids = [];
         this.env = {
-            obstacle: [
-                new Obstacle(
-                    new Vector(window.innerWidth / 2, window.innerHeight / 2)
-                ),
-            ],
+            obstacle: [],
             scatterer: [],
             goal: [],
         };
@@ -469,7 +457,7 @@ class Simulator {
         Simulator.INSTANCE = this;
 
         // Toggling modes
-        this.spawnable = Simulator.SPAWNABLES.VIEW;
+        this.mode = Simulator.MODE_ENUM.VIEW;
         this.notifEl = document.getElementById("notification");
         this.notifTimer = setTimeout(() => {
             this.notifEl.style.opacity = 0;
@@ -509,61 +497,59 @@ class Simulator {
     }
 
     spawn(x, y) {
-        switch (this.spawnable) {
-            case Simulator.SPAWNABLES.VIEW:
+        switch (this.mode) {
+            case Simulator.MODE_ENUM.VIEW:
                 break;
-            case Simulator.SPAWNABLES.BOID:
+            case Simulator.MODE_ENUM.BOID:
                 this.boids.push(Boid.random(new Vector(x, y)));
                 break;
-            case Simulator.SPAWNABLES.OBSTACLE:
+            case Simulator.MODE_ENUM.OBSTACLE:
                 this.env["obstacle"].push(new Obstacle(new Vector(x, y)));
                 break;
-            case Simulator.SPAWNABLES.SCATTERER:
+            case Simulator.MODE_ENUM.SCATTERER:
                 this.env["scatterer"].push(new Scatterer(new Vector(x, y)));
                 break;
-            case Simulator.SPAWNABLES.GOAL:
+            case Simulator.MODE_ENUM.GOAL:
                 this.env["goal"].push(new Goal(new Vector(x, y)));
                 break;
             default:
                 console.warn(
-                    "this.spawnable value does not match Spawnable enum. Nothing spawned!"
+                    "this.mode value does not match Spawnable enum. Nothing spawned!"
                 );
         }
     }
 
     despawn(x, y) {
-        switch (this.spawnable) {
-            case Simulator.SPAWNABLES.VIEW:
-            case Simulator.SPAWNABLES.BOID:
+        switch (this.mode) {
+            case Simulator.MODE_ENUM.VIEW:
+            case Simulator.MODE_ENUM.BOID:
                 break;
-            case Simulator.SPAWNABLES.OBSTACLE:
-                this.env["obstacle"] = this.env["obstacle"].filter(
-                    (o) => o.pos.dist(new Vector(x, y)) > Simulator.DESPAWN_DIST
-                );
-                break;
-            case Simulator.SPAWNABLES.SCATTERER:
-                this.env["scatterer"] = this.env["scatterer"].filter(
-                    (s) => s.pos.dist(new Vector(x, y)) > Simulator.DESPAWN_DIST
-                );
-                break;
-            case Simulator.SPAWNABLES.GOAL:
-                this.env["goal"] = this.env["goal"].filter(
-                    (g) => g.pos.dist(new Vector(x, y)) > Simulator.DESPAWN_DIST
+            case Simulator.MODE_ENUM.OBSTACLE:
+            case Simulator.MODE_ENUM.SCATTERER:
+            case Simulator.MODE_ENUM.GOAL:
+                const envObjType = Simulator.SPAWANABLE[this.mode - 1];
+                this.env[envObjType] = this.env[envObjType].filter(
+                    (envObj) =>
+                        envObj.pos.dist(new Vector(x, y)) >
+                        Simulator.DESPAWN_DIST
                 );
                 break;
             default:
                 console.warn(
-                    "this.spawnable value does not match Spawnable enum. Nothing despawned!"
+                    "this.mode value does not match Spawnable enum. Nothing despawned!"
                 );
         }
     }
 
     toggleSpawnOption() {
-        this.spawnable = (this.spawnable + 1) % Simulator.NUM_SPAWANABLES;
+        this.mode = (this.mode + 1) % Simulator.NUM_MODES;
 
         clearTimeout(this.notifTimer);
 
-        this.notifEl.innerText = Simulator.ALERT_TEXT[this.spawnable];
+        this.notifEl.innerText =
+            this.mode === 0
+                ? "View"
+                : `Click to add ${Simulator.SPAWANABLE[this.mode - 1]}s`;
         this.notifEl.style.opacity = 1;
         this.notifTimer = setTimeout(() => {
             this.notifEl.style.opacity = 0;
