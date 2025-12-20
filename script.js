@@ -1,6 +1,3 @@
-const root = document.documentElement;
-const bgColor = getComputedStyle(root).getPropertyValue("--bg-color");
-
 class Vector {
     static ZERO = new Vector(0, 0);
     static BOUND = null;
@@ -125,9 +122,10 @@ class Goal extends EnvObjs {
 }
 
 class Obstacle extends EnvObjs {
-    static defaults = { SIZE: 40, AVOID_RANGE: 35 };
+    static defaults = { SIZE: 40, AVOID_RANGE: 35, I_AVOID: 10 };
     static REACTION_DIST =
         Obstacle.defaults.SIZE + Obstacle.defaults.AVOID_RANGE;
+    static INTEMEDIARY_DIST = Obstacle.defaults.SIZE + Obstacle.I_AVOID;
 
     constructor(pos, lifespan = EnvObjs.defaults.LIFESPAN) {
         super(pos, lifespan);
@@ -244,29 +242,41 @@ class Boid {
             );
             const shadeVec = this.vel.add(proj_vel_diff.scalarMul(-1));
 
-            return v.add(shadeVec) //.scalarMul(this.vel.norm() / shadeVec.norm()));
+            return v.add(shadeVec); //.scalarMul(this.vel.norm() / shadeVec.norm()));
         }, Vector.ZERO);
-        
+
+        if (obstNudge !== Vector.ZERO) {
+            this.vel = this.vel.add(
+                obstNudge.scalarMul(this.vel.norm() / obstNudge.norm())
+            );
+        }
+
+        // Logic to prevent boids from slipping through adjacent obstacles
         let intermediariesNudge = Vector.ZERO;
-        for (const obs1 of relevantObstacles) {
-            for (const obs2 of relevantObstacles) {
-                if (obs1 ==- obs2) continue;
-                const midPoint = obs2.pos.add(obs1.pos).scalarMul(1/2);
-                if (obs1.pos.dist(midPoint) > Obstacle.defaults.SIZE) continue
-                if (midPoint.dist(this.pos) > Obstacle.defaults.SIZE + 10) continue
-                const dir = this.pos.add(midPoint.scalarMul(-1))
-                intermediariesNudge = intermediariesNudge.add(dir);
+        for (let i = 0; i < relevantObstacles.length; i++) {
+            for (let j = i + 1; j < relevantObstacles.length; j++) {
+                const obs1 = relevantObstacles[i];
+                const obs2 = relevantObstacles[j];
+
+                const midPoint = obs2.pos.add(obs1.pos).scalarMul(1 / 2);
+                if (
+                    obs1.pos.dist(midPoint) > Obstacle.defaults.SIZE ||
+                    midPoint.dist(this.pos) > Obstacle.INTEMEDIARY_DIST
+                )
+                    continue;
+
+                const reDirVec = this.pos.add(midPoint.scalarMul(-1));
+                intermediariesNudge = intermediariesNudge.add(reDirVec);
             }
         }
 
-        if (obstNudge !== Vector.ZERO) {
-            this.vel = this.vel.add(obstNudge.scalarMul(this.vel.norm() / obstNudge.norm()))
-        };
-
         if (intermediariesNudge !== Vector.ZERO) {
-            this.vel = this.vel.add(intermediariesNudge.scalarMul(this.vel.norm() / intermediariesNudge.norm()));
+            this.vel = this.vel.add(
+                intermediariesNudge.scalarMul(
+                    this.vel.norm() / intermediariesNudge.norm()
+                )
+            );
         }
-        // this.vel = this.vel.add(obstNudge);
     }
 
     capSpeed() {
@@ -313,8 +323,9 @@ class Boid {
 class Drawer {
     // Drawing Wide
     static SHADOWBLUR = 15;
-    static PRIMARY_SHADE =
-        getComputedStyle(root).getPropertyValue("--boid-color");
+    static PRIMARY_SHADE = getComputedStyle(
+        document.documentElement
+    ).getPropertyValue("--boid-color");
     static SECONDARY_SHADE = `rgb(${Drawer.PRIMARY_SHADE.match(
         /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/
     )
@@ -329,10 +340,7 @@ class Drawer {
 
     // For Obstacle
     static OBSTAClE = {
-        COLOR: Drawer.SECONDARY_SHADE.replace("rgb", "rgba").replace(
-            ")",
-            ", 0.4)"
-        ),
+        COLOR: Drawer.SECONDARY_SHADE.replace("rgb", "rgba"),
     };
 
     // For scatterer
