@@ -237,16 +237,36 @@ class Boid {
             const diffVec = o.pos.add(this.pos.scalarMul(-1));
             const dotProduct = this.vel.dot(diffVec);
 
-            if (dotProduct < 0) return Vector.ZERO;
+            if (dotProduct < 0) return v;
 
             const proj_vel_diff = diffVec.scalarMul(
                 dotProduct / diffVec.dot(diffVec)
             );
             const shadeVec = this.vel.add(proj_vel_diff.scalarMul(-1));
-            return v.add(shadeVec.scalarMul(this.vel.norm() / shadeVec.norm()));
-        }, Vector.ZERO);
 
-        this.vel = this.vel.add(obstNudge);
+            return v.add(shadeVec) //.scalarMul(this.vel.norm() / shadeVec.norm()));
+        }, Vector.ZERO);
+        
+        let intermediariesNudge = Vector.ZERO;
+        for (const obs1 of relevantObstacles) {
+            for (const obs2 of relevantObstacles) {
+                if (obs1 ==- obs2) continue;
+                const midPoint = obs2.pos.add(obs1.pos).scalarMul(1/2);
+                if (obs1.pos.dist(midPoint) > Obstacle.defaults.SIZE) continue
+                if (midPoint.dist(this.pos) > Obstacle.defaults.SIZE + 10) continue
+                const dir = this.pos.add(midPoint.scalarMul(-1))
+                intermediariesNudge = intermediariesNudge.add(dir);
+            }
+        }
+
+        if (obstNudge !== Vector.ZERO) {
+            this.vel = this.vel.add(obstNudge.scalarMul(this.vel.norm() / obstNudge.norm()))
+        };
+
+        if (intermediariesNudge !== Vector.ZERO) {
+            this.vel = this.vel.add(intermediariesNudge.scalarMul(this.vel.norm() / intermediariesNudge.norm()));
+        }
+        // this.vel = this.vel.add(obstNudge);
     }
 
     capSpeed() {
@@ -309,8 +329,10 @@ class Drawer {
 
     // For Obstacle
     static OBSTAClE = {
-        BORDER_COLOR: Drawer.PRIMARY_SHADE,
-        COLOR: Drawer.SECONDARY_SHADE,
+        COLOR: Drawer.SECONDARY_SHADE.replace("rgb", "rgba").replace(
+            ")",
+            ", 0.4)"
+        ),
     };
 
     // For scatterer
